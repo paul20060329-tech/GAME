@@ -1,8 +1,7 @@
 import random
 import tkinter as tk
-from dataclasses import dataclass
 from math import cos, pi, sin
-from typing import Callable, List, Optional, Sequence, Tuple
+from typing import List, Sequence, Tuple
 
 
 def _heart_xy(t: float) -> Tuple[float, float]:
@@ -31,7 +30,7 @@ def _generate_heart_positions(
 
     positions: List[Tuple[int, int]] = []
     for i in range(count):
-        t = (i / max(1, count)) * (2 * pi) + random.uniform(-0.035, 0.035)
+        t = (i / max(1, count)) * (2 * pi)
         x, y = _heart_xy(t)
         px = int(center_x + x * scale)
         py = int(center_y - y * scale)
@@ -47,246 +46,123 @@ def _generate_heart_positions(
 
 
 def _pick(seq: Sequence[str]) -> str:
-    return random.choice(seq)
+    return seq[random.randint(0, len(seq) - 1)]
 
 
-def _rounded_rect_points(x1: int, y1: int, x2: int, y2: int, r: int) -> List[int]:
-    r = max(0, min(r, (x2 - x1) // 2, (y2 - y1) // 2))
-    return [
-        x1 + r,
-        y1,
-        x2 - r,
-        y1,
-        x2,
-        y1,
-        x2,
-        y1 + r,
-        x2,
-        y2 - r,
-        x2,
-        y2,
-        x2 - r,
-        y2,
-        x1 + r,
-        y2,
-        x1,
-        y2,
-        x1,
-        y2 - r,
-        x1,
-        y1 + r,
-        x1,
-        y1,
-    ]
+class AnimatedPopup:
+    """带全套动感特效的弹窗类"""
+    def __init__(self, root: tk.Tk, x: int, y: int, w: int, h: int,
+                 bg_color: str, text: str, fg: str, font, win_w: int, win_h: int):
+        self.root = root
+        self.x = x
+        self.y = y
+        self.w = w
+        self.h = h
+        self.win_w = win_w
+        self.win_h = win_h
+        self.bg_color = bg_color
+        self.text = text
+        self.fg = fg
+        self.font = font
 
+        # 动画参数
+        self.alpha = 0.0
+        self.float_offset = 0
+        self.scale_rate = 1.0
+        self.fade_out_start = False
+        self.life_time = random.randint(4500, 7000)
 
-@dataclass(frozen=True)
-class PopupStyle:
-    size: Tuple[int, int] = (240, 70)
-    fg: str = "#2c2c2c"
-    font: Tuple[str, int, str] = ("Microsoft YaHei", 13, "bold")
-    hint_font: Tuple[str, int, str] = ("Microsoft YaHei", 8, "bold")
-    deco_font: Tuple[str, int] = ("Microsoft YaHei", 10)
-    radius: int = 14
-    border: str = "#ffb3c6"
-    border_width: int = 2
-    shadow: str = "#000000"
-    shadow_alpha: float = 0.16
-    shadow_offset: Tuple[int, int] = (3, 4)
-    window_alpha: float = 0.94
-    fade_in_ms: int = 220
-    fade_out_ms: int = 260
-    hold_ms: Optional[int] = None
-    float_px: int = 10
+        # 创建窗口
+        self.win = tk.Toplevel(root)
+        self.win.overrideredirect(True)
+        self.win.attributes("-alpha", self.alpha)
+        self.win.attributes("-topmost", True)
+        self.win.geometry(f"{self.win_w}x{self.win_h}+{self.x}+{self.y}")
 
+        # 容器与边框
+        self.container = tk.Frame(self.win, bg=bg_color,
+                                  highlightbackground="#ffb3c6", highlightthickness=2)
+        self.container.pack(fill="both", expand=True)
 
-class PopupWindow:
-    def __init__(
-        self,
-        root: tk.Tk,
-        *,
-        x: int,
-        y: int,
-        width: int,
-        height: int,
-        message: str,
-        bg: str,
-        style: PopupStyle,
-        topmost: bool,
-        show_hint: bool,
-        on_destroy: Callable[["PopupWindow"], None],
-    ) -> None:
-        self._root = root
-        self._style = style
-        self._bg = bg
-        self._on_destroy = on_destroy
-        self._target_x = x
-        self._target_y = y
-        self._w = tk.Toplevel(root)
-        self._w.overrideredirect(True)
-        self._w.attributes("-alpha", 0.0)
-        if topmost:
-            self._w.attributes("-topmost", True)
-        start_y = y + max(0, style.float_px)
-        self._w.geometry(f"{width}x{height}+{x}+{start_y}")
+        # 装饰跳动爱心
+        self.heart1 = tk.Label(self.container, text="❤", bg=bg_color, fg="#ff4d6d",
+                               font=("Microsoft YaHei", 10))
+        self.heart1.place(x=6, y=4)
+        self.heart2 = tk.Label(self.container, text="❤", bg=bg_color, fg="#ff4d6d",
+                               font=("Microsoft YaHei", 10))
+        self.heart2.place(x=self.win_w - 22, y=self.win_h - 24)
 
-        self._canvas = tk.Canvas(self._w, width=width, height=height, highlightthickness=0, bg=bg)
-        self._canvas.pack(fill="both", expand=True)
+        # 主文案
+        self.label = tk.Label(self.container, text=self.text, bg=bg_color,
+                              fg=self.fg, font=self.font)
+        self.label.place(relx=0.5, rely=0.5, anchor="center")
 
-        self._draw(width, height, message, show_hint)
+        # 启动所有动画
+        self.fade_in()
+        self.float_animate()
+        self.pulse_scale()
+        self.heart_beat()
+        self.auto_life()
 
-        self._w.bind("<Button-1>", lambda _evt: self.destroy())
-        self._w.bind("<Escape>", lambda _evt: self.destroy())
+    def fade_in(self):
+        """渐入动画"""
+        if self.alpha < 0.92 and not self.fade_out_start:
+            self.alpha += 0.04
+            self.win.attributes("-alpha", self.alpha)
+            self.root.after(30, self.fade_in)
 
-        self._animate_in_started = False
-        self._animate_out_started = False
-        self._anim_start_ms = 0
-        self._anim_after_id: Optional[str] = None
-
-        self._start_in_animation()
-
-        if style.hold_ms is not None:
-            self._w.after(style.hold_ms, self._start_out_animation)
-
-    def _draw(self, width: int, height: int, message: str, show_hint: bool) -> None:
-        r = self._style.radius
-        bx = self._style.border_width
-        ox, oy = self._style.shadow_offset
-
-        shadow_color = self._style.shadow
-        shadow_stipple = "gray50"
-        if self._style.shadow_alpha <= 0.12:
-            shadow_stipple = "gray25"
-        elif self._style.shadow_alpha <= 0.20:
-            shadow_stipple = "gray50"
-        elif self._style.shadow_alpha <= 0.30:
-            shadow_stipple = "gray75"
+    def fade_out(self):
+        """渐出消失"""
+        if self.alpha > 0:
+            self.alpha -= 0.03
+            self.win.attributes("-alpha", self.alpha)
+            self.root.after(30, self.fade_out)
         else:
-            shadow_stipple = ""
-
-        if shadow_stipple:
-            self._canvas.create_polygon(
-                _rounded_rect_points(bx + ox, bx + oy, width - bx + ox, height - bx + oy, r),
-                fill=shadow_color,
-                outline="",
-                smooth=True,
-                splinesteps=36,
-                stipple=shadow_stipple,
-            )
-
-        self._canvas.create_polygon(
-            _rounded_rect_points(bx, bx, width - bx, height - bx, r),
-            fill=self._bg,
-            outline=self._style.border,
-            width=bx,
-            smooth=True,
-            splinesteps=36,
-        )
-
-        self._canvas.create_text(14, 12, text="❤", fill="#ff4d6d", font=self._style.deco_font, anchor="nw")
-        self._canvas.create_text(width - 14, height - 12, text="❤", fill="#ff4d6d", font=self._style.deco_font, anchor="se")
-
-        if show_hint:
-            self._canvas.create_text(
-                width // 2,
-                12,
-                text="按 ESC 退出",
-                fill="#ff7b93",
-                font=self._style.hint_font,
-                anchor="n",
-            )
-
-        self._canvas.create_text(
-            width // 2,
-            height // 2 + 2,
-            text=message,
-            fill=self._style.fg,
-            font=self._style.font,
-            anchor="center",
-        )
-
-    def _now_ms(self) -> int:
-        return int(self._root.tk.call("after", "info"))
-
-    def _start_in_animation(self) -> None:
-        if self._animate_in_started:
-            return
-        self._animate_in_started = True
-        self._anim_start_ms = self._root.winfo_fpixels("1i")  # stable init
-        self._anim_start_time = self._root.winfo_toplevel().tk.call("clock", "milliseconds")
-        self._tick_in()
-
-    def _tick_in(self) -> None:
-        if self._animate_out_started:
-            return
-        now = int(self._root.tk.call("clock", "milliseconds"))
-        elapsed = max(0, now - int(self._anim_start_time))
-        dur = max(1, self._style.fade_in_ms)
-        t = min(1.0, elapsed / dur)
-        eased = 1 - (1 - t) * (1 - t)
-
-        alpha = self._style.window_alpha * eased
-        self._safe_set_alpha(alpha)
-
-        dy = int(round(self._style.float_px * (1 - eased)))
-        self._w.geometry(f"+{self._target_x}+{self._target_y + dy}")
-
-        if t < 1.0:
-            self._anim_after_id = self._w.after(16, self._tick_in)
-        else:
-            self._safe_set_alpha(self._style.window_alpha)
-            self._w.geometry(f"+{self._target_x}+{self._target_y}")
-
-    def _start_out_animation(self) -> None:
-        if self._animate_out_started:
-            return
-        self._animate_out_started = True
-        if self._anim_after_id is not None:
             try:
-                self._w.after_cancel(self._anim_after_id)
-            except tk.TclError:
+                self.win.destroy()
+            except:
                 pass
-            self._anim_after_id = None
-        self._anim_start_time = self._root.winfo_toplevel().tk.call("clock", "milliseconds")
-        self._tick_out()
 
-    def _tick_out(self) -> None:
-        now = int(self._root.tk.call("clock", "milliseconds"))
-        elapsed = max(0, now - int(self._anim_start_time))
-        dur = max(1, self._style.fade_out_ms)
-        t = min(1.0, elapsed / dur)
-        eased = t * t
+    def float_animate(self):
+        """缓慢上浮+左右轻微漂移"""
+        if self.fade_out_start:
+            return
+        self.float_offset += 1
+        new_y = self.y - int(self.float_offset / 8) + int(sin(self.float_offset/3) * 6)
+        self.win.geometry(f"{self.win_w}x{self.win_h}+{self.x}+{new_y}")
+        self.root.after(50, self.float_animate)
 
-        alpha = self._style.window_alpha * (1 - eased)
-        self._safe_set_alpha(alpha)
+    def pulse_scale(self):
+        """呼吸缩放脉动"""
+        if self.fade_out_start:
+            return
+        self.scale_rate += 0.0025
+        if self.scale_rate > 1.06 or self.scale_rate < 0.96:
+            self.scale_rate = 1.0
+        self.root.after(60, self.pulse_scale)
 
-        dy = int(round(self._style.float_px * eased))
-        self._w.geometry(f"+{self._target_x}+{self._target_y - dy}")
+    def heart_beat(self):
+        """角落爱心跳动变色"""
+        if self.fade_out_start:
+            return
+        color_list = ["#ff4d6d", "#ff758f", "#ff9aa2"]
+        self.heart1.config(fg=_pick(color_list))
+        self.heart2.config(fg=_pick(color_list))
+        self.root.after(180, self.heart_beat)
 
-        if t < 1.0:
-            self._anim_after_id = self._w.after(16, self._tick_out)
-        else:
-            self.destroy()
+    def auto_life(self):
+        """存活时间到自动淡出"""
+        self.root.after(self.life_time, self.start_fade_out)
 
-    def _safe_set_alpha(self, alpha: float) -> None:
+    def start_fade_out(self):
+        self.fade_out_start = True
+        self.fade_out()
+
+    def destroy(self):
         try:
-            self._w.attributes("-alpha", max(0.0, min(1.0, alpha)))
-        except tk.TclError:
+            self.win.destroy()
+        except:
             pass
-
-    def destroy(self) -> None:
-        try:
-            if not self._animate_out_started and self._style.fade_out_ms > 0:
-                self._start_out_animation()
-                return
-        except tk.TclError:
-            pass
-
-        try:
-            self._w.destroy()
-        except tk.TclError:
-            pass
-        self._on_destroy(self)
 
 
 class PopupManager:
@@ -299,7 +175,9 @@ class PopupManager:
         count_heart: int = 160,
         count_random: int = 120,
         interval_ms: int = 25,
-        style: Optional[PopupStyle] = None,
+        size: Tuple[int, int] = (240, 70),
+        fg: str = "#333333",
+        font: Tuple[str, int, str] = ("Microsoft YaHei", 13, "bold"),
         topmost: bool = True,
     ) -> None:
         self.root = root
@@ -308,21 +186,19 @@ class PopupManager:
         self.count_heart = count_heart
         self.count_random = count_random
         self.interval_ms = interval_ms
-        self.style = style or PopupStyle()
-        self.width, self.height = self.style.size
+        self.width, self.height = size
+        self.fg = fg
+        self.font = font
         self.topmost = topmost
 
-        self._alive: List[PopupWindow] = []
+        self._alive: List[AnimatedPopup] = []
         self._phase = "heart"
         self._spawned = 0
         self._heart_positions: List[Tuple[int, int]] = []
 
     def stop(self) -> None:
-        for w in list(self._alive):
-            try:
-                w.destroy()
-            except tk.TclError:
-                pass
+        for w in self._alive:
+            w.destroy()
         self._alive.clear()
 
     def start(self) -> None:
@@ -361,30 +237,18 @@ class PopupManager:
             y = random.randint(0, max(0, screen_h - self.height))
 
         bg = _pick(self.colors)
+        text = _pick(self.messages)
 
-        def _on_destroy(p: PopupWindow) -> None:
-            try:
-                self._alive.remove(p)
-            except ValueError:
-                pass
-
-        p = PopupWindow(
-            self.root,
-            x=x,
-            y=y,
-            width=self.width,
-            height=self.height,
-            message=_pick(self.messages),
-            bg=bg,
-            style=self.style,
-            topmost=self.topmost,
-            show_hint=(self._spawned == 0),
-            on_destroy=_on_destroy,
+        # 创建带动画的弹窗
+        popup = AnimatedPopup(
+            self.root, x, y, self.width, self.height,
+            bg, text, self.fg, self.font, self.width, self.height
         )
-        self._alive.append(p)
+        self._alive.append(popup)
         self._spawned += 1
 
         self._schedule_next()
+
 
 def _run() -> None:
     root = tk.Tk()
@@ -408,30 +272,16 @@ def _run() -> None:
 
     colors = ["#ffd1dc", "#cdeffd", "#d9fdd3", "#ffe7c7", "#efe0ff", "#fff3b0"]
 
-    style = PopupStyle(
-        size=(240, 70),
-        fg="#2c2c2c",
-        font=("Microsoft YaHei", 13, "bold"),
-        radius=14,
-        border="#ffb3c6",
-        border_width=2,
-        shadow_alpha=0.16,
-        shadow_offset=(3, 4),
-        window_alpha=0.94,
-        fade_in_ms=220,
-        fade_out_ms=260,
-        hold_ms=None,
-        float_px=10,
-    )
-
     popups = PopupManager(
         root,
         messages,
         colors,
         count_heart=180,
         count_random=160,
-        interval_ms=25,
-        style=style,
+        interval_ms=20,
+        size=(240, 70),
+        fg="#333333",
+        font=("Microsoft YaHei", 13, "bold"),
         topmost=True,
     )
 
