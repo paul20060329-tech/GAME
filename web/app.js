@@ -23,6 +23,20 @@ const btnStart = $("btnStart");
 const btnClear = $("btnClear");
 const chipStatus = $("chipStatus");
 
+const surveyModal = $("surveyModal");
+const surveyForm = $("surveyForm");
+const surveyHint = $("surveyHint");
+const surveyName = $("surveyName");
+const surveyAge = $("surveyAge");
+const surveyGender = $("surveyGender");
+const surveyCity = $("surveyCity");
+const surveyOcc = $("surveyOcc");
+const surveyPurpose = $("surveyPurpose");
+const surveyFeedback = $("surveyFeedback");
+const surveyContact = $("surveyContact");
+const surveyConsent = $("surveyConsent");
+const surveySubmit = $("surveySubmit");
+
 const inputCountHeart = $("countHeart");
 const inputCountRandom = $("countRandom");
 const inputIntervalMs = $("intervalMs");
@@ -30,6 +44,87 @@ const inputTtlMs = $("ttlMs");
 
 const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
 const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
+
+const storageKey = "lovePopSurveySubmittedV1";
+let surveyReady = false;
+
+const setButtonsEnabled = (enabled) => {
+  btnStart.disabled = !enabled;
+  btnClear.disabled = !enabled;
+  btnStart.style.opacity = enabled ? "1" : "0.65";
+  btnClear.style.opacity = enabled ? "1" : "0.65";
+};
+
+const showSurvey = () => {
+  if (!surveyModal) return;
+  surveyModal.hidden = false;
+  surveyHint.textContent = "";
+  setButtonsEnabled(false);
+  chipStatus.textContent = "请先填写信息";
+  window.setTimeout(() => {
+    try {
+      surveyName.focus();
+    } catch {}
+  }, 0);
+};
+
+const hideSurvey = () => {
+  if (!surveyModal) return;
+  surveyModal.hidden = true;
+  setButtonsEnabled(true);
+  chipStatus.textContent = "就绪";
+};
+
+const submitSurvey = async () => {
+  const payload = {
+    name: surveyName.value.trim(),
+    ageRange: surveyAge.value,
+    gender: surveyGender.value,
+    city: surveyCity.value.trim(),
+    occupation: surveyOcc.value.trim(),
+    purpose: surveyPurpose.value,
+    feedback: surveyFeedback.value.trim(),
+    contact: surveyContact.value.trim(),
+    consent: surveyConsent.checked,
+  };
+
+  if (!payload.name) {
+    surveyHint.textContent = "请填写昵称";
+    return false;
+  }
+  if (!payload.ageRange || !payload.gender) {
+    surveyHint.textContent = "请选择年龄段与性别";
+    return false;
+  }
+  if (!payload.consent) {
+    surveyHint.textContent = "需要勾选同意才能提交";
+    return false;
+  }
+
+  surveyHint.textContent = "提交中…";
+  surveySubmit.disabled = true;
+  try {
+    const res = await fetch("/api/survey", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || !data.ok) {
+      surveyHint.textContent = "提交失败，请稍后再试";
+      return false;
+    }
+    localStorage.setItem(storageKey, "1");
+    surveyReady = true;
+    hideSurvey();
+    return true;
+  } catch {
+    surveyHint.textContent = "无法连接后端，请先启动后端服务";
+    return false;
+  } finally {
+    surveySubmit.disabled = false;
+  }
+};
 
 const heartXY = (t) => {
   const x = 16 * Math.pow(Math.sin(t), 3);
@@ -107,6 +202,10 @@ class Engine {
   }
 
   toggle() {
+    if (!surveyReady) {
+      showSurvey();
+      return;
+    }
     if (this.running) this.stop();
     else this.start();
   }
@@ -287,3 +386,17 @@ window.addEventListener("resize", () => {
 });
 
 chipStatus.textContent = "就绪";
+
+if (surveyForm) {
+  surveyForm.addEventListener("submit", (e) => {
+    e.preventDefault();
+    submitSurvey();
+  });
+}
+
+surveyReady = localStorage.getItem(storageKey) === "1";
+if (!surveyReady) {
+  showSurvey();
+} else {
+  hideSurvey();
+}

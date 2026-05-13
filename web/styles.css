@@ -410,8 +410,145 @@ input[type="number"]:focus-visible {
   }
 }
 
+.modal[hidden] {
+  display: none;
+}
+
+.modal {
+  position: fixed;
+  inset: 0;
+  z-index: 5;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  background: rgba(16, 18, 22, 0.18);
+  backdrop-filter: blur(10px);
+}
+
+.modalCard {
+  width: min(720px, calc(100vw - 36px));
+  max-height: min(82vh, 780px);
+  overflow: auto;
+  border-radius: 22px;
+  border: 1px solid rgba(255, 179, 198, 0.55);
+  background: rgba(255, 255, 255, 0.78);
+  box-shadow: 0 22px 70px rgba(16, 18, 22, 0.18);
+  padding: 16px;
+}
+
+.modalHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid rgba(20, 22, 26, 0.08);
+}
+
+.modalTitle {
+  font-weight: 900;
+  font-size: 16px;
+}
+
+.modalSub {
+  margin-top: 2px;
+  font-size: 12px;
+  color: rgba(20, 22, 26, 0.6);
+  font-weight: 800;
+}
+
+.modalMark {
+  width: 42px;
+  height: 42px;
+  display: grid;
+  place-items: center;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.7);
+  border: 1px solid rgba(255, 179, 198, 0.55);
+  color: rgba(255, 77, 109, 0.92);
+  font-weight: 900;
+}
+
+.modalForm {
+  padding-top: 12px;
+  display: grid;
+  gap: 12px;
+}
+
+.modalGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.mField {
+  display: grid;
+  gap: 6px;
+}
+
+.mLabel {
+  font-size: 12px;
+  color: rgba(20, 22, 26, 0.62);
+  font-weight: 900;
+}
+
+select,
+textarea,
+.modalForm input {
+  width: 100%;
+  border: 1px solid rgba(20, 22, 26, 0.12);
+  border-radius: 14px;
+  padding: 10px 12px;
+  font-weight: 800;
+  background: rgba(255, 255, 255, 0.85);
+  color: rgba(20, 22, 26, 0.9);
+  outline: none;
+}
+
+textarea {
+  min-height: 88px;
+  resize: vertical;
+}
+
+select:focus-visible,
+textarea:focus-visible,
+.modalForm input:focus-visible {
+  outline: 3px solid var(--ring);
+  outline-offset: 2px;
+}
+
+.mCheck {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  font-size: 12px;
+  color: rgba(20, 22, 26, 0.7);
+  font-weight: 800;
+}
+
+.mCheck input {
+  margin-top: 2px;
+  width: 16px;
+  height: 16px;
+}
+
+.modalActions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.modalHint {
+  font-size: 12px;
+  color: rgba(20, 22, 26, 0.6);
+  font-weight: 800;
+  min-height: 16px;
+}
+
 @media (max-width: 820px) {
   .grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .modalGrid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
   .footer {

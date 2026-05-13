@@ -75,6 +75,90 @@
       <span>基于原 Tkinter 弹窗逻辑复刻为 Web 动效</span>
     </footer>
 
+    <div class="modal" id="surveyModal" role="dialog" aria-modal="true" aria-labelledby="surveyTitle" hidden>
+      <div class="modalCard">
+        <div class="modalHeader">
+          <div>
+            <div class="modalTitle" id="surveyTitle">进入前填写一下小信息</div>
+            <div class="modalSub">用于用户调查与分析（可不填联系方式）</div>
+          </div>
+          <div class="modalMark" aria-hidden="true">❤</div>
+        </div>
+
+        <form id="surveyForm" class="modalForm">
+          <div class="modalGrid">
+            <label class="mField">
+              <div class="mLabel">昵称</div>
+              <input id="surveyName" required maxlength="80" placeholder="怎么称呼你" />
+            </label>
+
+            <label class="mField">
+              <div class="mLabel">年龄段</div>
+              <select id="surveyAge" required>
+                <option value="" selected disabled>请选择</option>
+                <option value="≤18">≤18</option>
+                <option value="19-24">19-24</option>
+                <option value="25-30">25-30</option>
+                <option value="31-40">31-40</option>
+                <option value="41+">41+</option>
+              </select>
+            </label>
+
+            <label class="mField">
+              <div class="mLabel">性别</div>
+              <select id="surveyGender" required>
+                <option value="" selected disabled>请选择</option>
+                <option value="女">女</option>
+                <option value="男">男</option>
+                <option value="其他/不便透露">其他/不便透露</option>
+              </select>
+            </label>
+
+            <label class="mField">
+              <div class="mLabel">城市</div>
+              <input id="surveyCity" maxlength="80" placeholder="例如：深圳" />
+            </label>
+
+            <label class="mField">
+              <div class="mLabel">职业</div>
+              <input id="surveyOcc" maxlength="80" placeholder="例如：学生 / 产品 / 设计" />
+            </label>
+
+            <label class="mField">
+              <div class="mLabel">来这里想做什么</div>
+              <select id="surveyPurpose">
+                <option value="放松一下" selected>放松一下</option>
+                <option value="找灵感">找灵感</option>
+                <option value="做测试/学习">做测试/学习</option>
+                <option value="其他">其他</option>
+              </select>
+            </label>
+          </div>
+
+          <label class="mField">
+            <div class="mLabel">想对我说的话</div>
+            <textarea id="surveyFeedback" maxlength="2000" placeholder="例如：希望增加更多特效/配色/文案…"></textarea>
+          </label>
+
+          <label class="mField">
+            <div class="mLabel">联系方式（可选）</div>
+            <input id="surveyContact" maxlength="120" placeholder="微信/QQ/邮箱（可不填）" />
+          </label>
+
+          <label class="mCheck">
+            <input id="surveyConsent" type="checkbox" required />
+            <span>我同意提交以上信息用于调查与分析</span>
+          </label>
+
+          <div class="modalActions">
+            <button class="btn primary" id="surveySubmit" type="submit">提交并进入</button>
+          </div>
+
+          <div class="modalHint" id="surveyHint"></div>
+        </form>
+      </div>
+    </div>
+
     <script src="./app.js"></script>
   </body>
 </html>
