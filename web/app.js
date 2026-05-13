@@ -445,8 +445,6 @@ const reviewScore = $("reviewScore");
 const reviewHint = $("reviewHint");
 const reviewSubmit = $("reviewSubmit");
 
-const apiBase = window.__LOVEPOP_API_BASE__ || "";
-
 const renderReviews = (data) => {
   if (!data || data.length === 0) {
     reviewsList.innerHTML = `<div style="text-align:center; padding: 20px; color: gray;">暂时没有评价，快来抢沙发！</div>`;
@@ -467,7 +465,8 @@ const renderReviews = (data) => {
 const fetchReviews = async () => {
   reviewsList.innerHTML = `<div style="text-align:center; padding: 20px; color: gray;">加载中...</div>`;
   try {
-    const res = await fetch(`${apiBase}/api/reviews`);
+    const url = apiBase ? `${apiBase}/api/reviews` : "/api/reviews";
+    const res = await fetch(url);
     const json = await res.json();
     if (json.ok) renderReviews(json.data);
   } catch (e) {
@@ -519,7 +518,8 @@ reviewForm.onsubmit = async (e) => {
   reviewHint.textContent = "提交中...";
   
   try {
-    const res = await fetch(`${apiBase}/api/reviews`, {
+    const url = apiBase ? `${apiBase}/api/reviews` : "/api/reviews";
+    const res = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ name, score, comment })
@@ -542,7 +542,13 @@ reviewForm.onsubmit = async (e) => {
 
 const engine = new Engine();
 
-btnStart.addEventListener("click", () => engine.toggle());
+btnStart.addEventListener("click", () => {
+  if (!surveyReady) {
+    showSurvey();
+    return;
+  }
+  engine.toggle();
+});
 btnClear.addEventListener("click", () => engine.stop({ clear: true }));
 
 window.addEventListener("keydown", (e) => {
@@ -551,10 +557,10 @@ window.addEventListener("keydown", (e) => {
 
 window.addEventListener("resize", () => {
   if (!engine.running) return;
-  const { countHeart } = engine.readConfig();
+  const config = engine.readConfig();
   const { w, h } = engine.viewport();
   const { cardW, cardH } = engine.cardSize();
-  engine.heartPositions = computeHeartPositions(w, h, cardW, cardH, countHeart);
+  engine.heartPositions = computePositions(w, h, cardW, cardH, config.countHeart, config.shapeType, config.sizeScale);
 });
 
 chipStatus.textContent = "就绪";
