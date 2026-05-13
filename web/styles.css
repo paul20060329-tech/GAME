@@ -554,45 +554,4 @@ textarea:focus-visible,
   .footer {
     display: none;
   }
-  
-  .topbar {
-    padding: 12px 14px;
-    flex-wrap: wrap;
-    gap: 12px;
-  }
-  
-  .hud {
-    top: 90px;
-    right: 14px;
-    gap: 6px;
-  }
-
-  .hud .chip:not(#chipStatus) {
-    display: none;
-  }
-  
-  .panel {
-    inset: auto 14px 14px 14px;
-    padding: 12px;
-  }
-}
-
-@media (max-width: 500px) {
-  .grid {
-    grid-template-columns: minmax(0, 1fr);
-  }
-  
-  .modalGrid {
-    grid-template-columns: minmax(0, 1fr);
-  }
-  
-  .modalCard {
-    width: 100%;
-    padding: 14px;
-    max-height: 90vh;
-  }
-  
-  .modalTitle {
-    font-size: 15px;
-  }
 }
