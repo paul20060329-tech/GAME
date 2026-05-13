@@ -116,8 +116,38 @@ class Store:
         with self.engine.begin() as conn:
             if self.database_url.startswith("sqlite:"):
                 conn.execute(text("create index if not exists idx_survey_created_at on survey(created_at)"))
+                conn.execute(
+                    text(
+                        """
+                        create table if not exists reviews (
+                            id integer primary key autoincrement,
+                            created_at text not null,
+                            name text,
+                            score integer,
+                            comment text,
+                            ip text
+                        )
+                        """
+                    )
+                )
+                conn.execute(text("create index if not exists idx_reviews_created_at on reviews(created_at)"))
             else:
                 conn.execute(text("create index if not exists idx_survey_created_at on survey(created_at)"))
+                conn.execute(
+                    text(
+                        """
+                        create table if not exists reviews (
+                            id serial primary key,
+                            created_at text not null,
+                            name text,
+                            score integer,
+                            comment text,
+                            ip text
+                        )
+                        """
+                    )
+                )
+                conn.execute(text("create index if not exists idx_reviews_created_at on reviews(created_at)"))
 
     def insert_survey(self, payload: Dict[str, object], *, user_agent: str, ip: str) -> int:
         name = _clamp_len(str(payload.get("name") or "").strip(), 80)
@@ -154,7 +184,56 @@ class Store:
                 row_id = result.scalar_one_or_none()
                 return int(row_id or 0)
 
-    def list_surveys(self, *, limit: int = 200) -> List[Mapping[str, object]]:
+    def insert_review(self, payload: Dict[str, object], *, ip: str) -> int:
+        name = _clamp_len(str(payload.get("name") or "匿名用户").strip(), 80)
+        try:
+            score = int(payload.get("score") or 5)
+        except Exception:
+            score = 5
+        score = max(1, min(score, 5))
+        comment = _clamp_len(str(payload.get("comment") or "").strip(), 2000)
+        created_at = _utc_now_iso()
+
+        with self.engine.begin() as conn:
+            cur = conn.execute(
+                text(
+                    """
+                    insert into reviews (
+                        created_at, name, score, comment, ip
+                    ) values (:created_at, :name, :score, :comment, :ip)
+                    """
+                ),
+                {
+                    "created_at": created_at,
+                    "name": name,
+                    "score": score,
+                    "comment": comment,
+                    "ip": _clamp_len(ip, 80),
+                },
+            )
+            try:
+                return int(cur.lastrowid)
+            except Exception:
+                return 0
+
+    def list_reviews(self, *, limit: int = 100) -> List[Dict[str, object]]:
+        limit = max(1, min(limit, 500))
+        with self.engine.connect() as conn:
+            cur = conn.execute(
+                text(
+                    """
+                    select
+                        id, created_at, name, score, comment, ip
+                    from reviews
+                    order by id desc
+                    limit :limit
+                    """
+                ),
+                {"limit": limit},
+            )
+            return [dict(r._mapping) for r in cur.fetchall()]
+
+    def list_surveys(self, *, limit: int = 200) -> List[Dict[str, object]]:
         limit = max(1, min(limit, 2000))
         with self.engine.begin() as conn:
             rows = (
@@ -411,7 +490,8 @@ def _admin_dashboard_page(*, stats: Dict[str, object], rows: List[sqlite3.Row]) 
       <h1>用户调查后台</h1>
       <div class="btns">
         <a class="btn" href="/">回到网站</a>
-        <a class="btn primary" href="/admin/export.csv">导出 CSV</a>
+        <a class="btn primary" href="/admin/export.csv">导出调查 CSV</a>
+        <a class="btn primary" href="/admin/export_reviews.csv" style="background:#fff3b0; color:#111; border-color:#ffe7c7;">导出评价 CSV</a>
         <form method="post" action="/admin/logout"><button class="btn" type="submit">退出</button></form>
       </div>
     </header>
@@ -565,15 +645,23 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_OPTIONS(self) -> None:
         path = urlparse(self.path).path
-        if path == "/api/survey":
+        if path == "/api/survey" or path == "/api/reviews":
             headers = self._cors_headers_for_api()
-            self._send(204, b"", content_type="text/plain; charset=utf-8", headers=headers)
+            headers.append(("Access-Control-Allow-Methods", "POST, OPTIONS"))
+            headers.append(("Access-Control-Allow-Headers", "Content-Type"))
+            self._send(204, b"", content_type="text/plain", headers=headers)
             return
-        self._send(404, b"Not Found", content_type="text/plain; charset=utf-8")
+        self._send(204, b"", content_type="text/plain")
 
     def do_GET(self) -> None:
         app = self._app()
         path = urlparse(self.path).path
+
+        if path == "/api/reviews":
+            rows = app.store.list_reviews(limit=50)
+            data = [{"name": r["name"], "score": r["score"], "comment": r["comment"], "created_at": r["created_at"]} for r in rows]
+            self._json(200, {"ok": True, "data": data}, headers=_cors_headers())
+            return
 
         if path == "/health":
             self._json(200, {"ok": True})
@@ -596,6 +684,25 @@ class Handler(BaseHTTPRequestHandler):
             if app.admin.password is None:
                 message = "未设置 ADMIN_PASSWORD，当前无法登录后台。请先在环境变量中设置 ADMIN_PASSWORD。"
             self._send(200, _admin_login_page(message=message), content_type="text/html; charset=utf-8")
+            return
+
+        if path == "/admin/export_reviews.csv":
+            if not self._is_admin():
+                self._redirect("/admin/login")
+                return
+            rows = app.store.list_reviews(limit=2000)
+            header = "id,created_at,name,score,comment\n"
+            lines = [header]
+            for r in rows:
+                v_id = str(r.get("id", ""))
+                v_at = str(r.get("created_at", ""))
+                v_name = str(r.get("name", "")).replace('"', '""')
+                v_score = str(r.get("score", ""))
+                v_comment = str(r.get("comment", "")).replace('"', '""')
+                lines.append(f'{v_id},{v_at},"{v_name}",{v_score},"{v_comment}"\n')
+            raw = "".join(lines).encode("utf-8")
+            headers = [("Content-Disposition", 'attachment; filename="reviews.csv"')]
+            self._send(200, raw, content_type="text/csv; charset=utf-8", headers=headers)
             return
 
         if path == "/admin/export.csv":
@@ -622,9 +729,19 @@ class Handler(BaseHTTPRequestHandler):
     def do_POST(self) -> None:
         app = self._app()
         path = urlparse(self.path).path
+        cors_headers = self._cors_headers_for_api()
+
+        if path == "/api/reviews":
+            raw = _read_body(self, limit=32_000)
+            data = _safe_json_loads(raw)
+            if not data.get("comment"):
+                self._json(400, {"ok": False, "error": "comment_required"}, headers=cors_headers)
+                return
+            rec_id = app.store.insert_review(data, ip=self._client_ip())
+            self._json(200, {"ok": True, "id": rec_id}, headers=cors_headers)
+            return
 
         if path == "/api/survey":
-            cors_headers = self._cors_headers_for_api()
             raw = _read_body(self, limit=96_000)
             data = _safe_json_loads(raw)
             consent = bool(data.get("consent"))

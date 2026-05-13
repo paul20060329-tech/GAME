@@ -41,6 +41,9 @@ const inputCountHeart = $("countHeart");
 const inputCountRandom = $("countRandom");
 const inputIntervalMs = $("intervalMs");
 const inputTtlMs = $("ttlMs");
+const selectShape = $("shapeType");
+const inputSizeScale = $("sizeScale");
+const inputCustomMessages = $("customMessages");
 
 const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
 const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
@@ -138,20 +141,75 @@ const heartXY = (t) => {
   return { x, y };
 };
 
-const computeHeartPositions = (viewportW, viewportH, cardW, cardH, count, margin = 18) => {
+const getPolygonPoints = (verts, count) => {
+  let totalLen = 0;
+  const edges = [];
+  for (let i = 0; i < verts.length; i++) {
+    const p1 = verts[i];
+    const p2 = verts[(i + 1) % verts.length];
+    const dx = p2.x - p1.x;
+    const dy = p2.y - p1.y;
+    const len = Math.sqrt(dx * dx + dy * dy);
+    edges.push({ p1, p2, len, dx, dy });
+    totalLen += len;
+  }
+  const positions = [];
+  let currentEdge = 0;
+  let currentDist = 0;
+  for (let i = 0; i < count; i++) {
+    const targetDist = (i / count) * totalLen;
+    while (currentEdge < edges.length - 1 && targetDist > currentDist + edges[currentEdge].len) {
+      currentDist += edges[currentEdge].len;
+      currentEdge++;
+    }
+    const edge = edges[currentEdge];
+    const t = edge.len === 0 ? 0 : (targetDist - currentDist) / edge.len;
+    positions.push({ x: edge.p1.x + edge.dx * t, y: edge.p1.y + edge.dy * t });
+  }
+  return positions;
+};
+
+const generateShape = (type, count) => {
+  if (type === 'heart') {
+    const positions = [];
+    for (let i = 0; i < count; i++) {
+      const t = (i / Math.max(1, count)) * (Math.PI * 2) + (Math.random() * 0.07 - 0.035);
+      positions.push(heartXY(t));
+    }
+    return positions;
+  } else if (type === 'star5') {
+    const verts = [];
+    for(let i=0; i<10; i++) {
+      const r = i % 2 === 0 ? 16 : 6.1;
+      const angle = (i * Math.PI) / 5 + Math.PI / 2;
+      verts.push({ x: r * Math.cos(angle), y: r * Math.sin(angle) });
+    }
+    return getPolygonPoints(verts, count);
+  } else if (type === 'star6') {
+    const verts = [];
+    for(let i=0; i<12; i++) {
+      const r = i % 2 === 0 ? 16 : 9.2;
+      const angle = (i * Math.PI) / 6 + Math.PI / 2;
+      verts.push({ x: r * Math.cos(angle), y: r * Math.sin(angle) });
+    }
+    return getPolygonPoints(verts, count);
+  }
+  return [];
+};
+
+const computePositions = (viewportW, viewportH, cardW, cardH, count, shapeType, sizeScale, margin = 18) => {
   const usableW = Math.max(1, viewportW - margin * 2);
   const usableH = Math.max(1, viewportH - margin * 2);
   const cx = margin + usableW / 2;
-  const cy = margin + usableH / 2;
-  let scale = Math.min(usableW / (32 + 6), usableH / (30 + 6));
-  scale *= 0.95;
+  const cy = Math.max(margin, (viewportH - 160) / 2); 
+  let scale = Math.min(usableW / 38, usableH / 36) * 0.95 * sizeScale;
 
+  const basePoints = generateShape(shapeType, count);
   const positions = [];
-  for (let i = 0; i < count; i += 1) {
-    const t = (i / Math.max(1, count)) * (Math.PI * 2) + (Math.random() * 0.07 - 0.035);
-    const { x, y } = heartXY(t);
-    let px = Math.round(cx + x * scale + (Math.random() * 21 - 10));
-    let py = Math.round(cy - y * scale + (Math.random() * 21 - 10));
+  for (let i = 0; i < count; i++) {
+    const bp = basePoints[i];
+    let px = Math.round(cx + bp.x * scale + (Math.random() * 21 - 10));
+    let py = Math.round(cy - bp.y * scale + (Math.random() * 21 - 10));
     px = clamp(px, 0, viewportW - cardW);
     py = clamp(py, 0, viewportH - cardH);
     positions.push([px, py]);
@@ -174,7 +232,17 @@ class Engine {
     const countRandom = clamp(parseInt(inputCountRandom.value, 10) || 160, 0, 600);
     const intervalMs = clamp(parseInt(inputIntervalMs.value, 10) || 25, 10, 200);
     const ttlMs = clamp(parseInt(inputTtlMs.value, 10) || 0, 0, 20000);
-    return { countHeart, countRandom, intervalMs, ttlMs };
+    const shapeType = selectShape.value || "heart";
+    const sizeScale = clamp(parseFloat(inputSizeScale.value) || 1.0, 0.5, 3.0);
+    
+    let activeMessages = messages;
+    const customText = inputCustomMessages.value.trim();
+    if (customText) {
+      activeMessages = customText.split('\n').map(s => s.trim()).filter(Boolean);
+      if (activeMessages.length === 0) activeMessages = messages;
+    }
+
+    return { countHeart, countRandom, intervalMs, ttlMs, shapeType, sizeScale, activeMessages };
   }
 
   start() {
@@ -183,10 +251,12 @@ class Engine {
     this.phase = "heart";
     this.spawned = 0;
 
-    const { countHeart } = this.readConfig();
+    const config = this.readConfig();
+    this.currentConfig = config;
+    
     const { w, h } = this.viewport();
     const { cardW, cardH } = this.cardSize();
-    this.heartPositions = computeHeartPositions(w, h, cardW, cardH, countHeart);
+    this.heartPositions = computePositions(w, h, cardW, cardH, config.countHeart, config.shapeType, config.sizeScale);
     chipStatus.textContent = "播放中";
     btnStart.textContent = "暂停";
     this.schedule();
@@ -227,19 +297,18 @@ class Engine {
   }
 
   schedule() {
-    const { intervalMs } = this.readConfig();
+    if (!this.running) return;
+    const { intervalMs } = this.currentConfig;
     this.timer = window.setTimeout(() => this.tick(), intervalMs);
   }
 
   tick() {
     if (!this.running) return;
-    const { countHeart, countRandom } = this.readConfig();
+    const { countHeart, countRandom, ttlMs, activeMessages } = this.currentConfig;
     const { w, h } = this.viewport();
     const { cardW, cardH } = this.cardSize();
 
-    let x = 0;
-    let y = 0;
-
+    let px, py;
     if (this.phase === "heart") {
       if (this.spawned >= countHeart) {
         this.phase = "random";
@@ -247,44 +316,38 @@ class Engine {
         this.schedule();
         return;
       }
-      const pos = this.heartPositions[this.spawned] || [
-        Math.floor(Math.random() * (w - cardW)),
-        Math.floor(Math.random() * (h - cardH)),
-      ];
-      x = pos[0];
-      y = pos[1];
+      [px, py] = this.heartPositions[this.spawned];
     } else {
       if (this.spawned >= countRandom) {
-        this.running = false;
-        btnStart.textContent = "开始";
-        chipStatus.textContent = "完成";
+        this.phase = "done";
+        this.stop();
         return;
       }
-      x = Math.floor(Math.random() * Math.max(1, w - cardW));
-      y = Math.floor(Math.random() * Math.max(1, h - cardH));
+      px = Math.round(Math.random() * Math.max(0, w - cardW));
+      py = Math.round(Math.random() * Math.max(0, h - cardH));
     }
 
     const p = new Popup({
-      x,
-      y,
+      parent: layer,
+      x: px,
+      y: py,
       w: cardW,
       h: cardH,
-      message: pick(messages),
+      message: pick(activeMessages),
       bg: pick(colors),
       showHint: this.phase === "heart" && this.spawned === 0,
-      ttlMs: this.readConfig().ttlMs,
+      ttlMs: ttlMs,
       onDismiss: () => this.popups.delete(p),
     });
-    this.popups.add(p);
-    p.mount(layer);
 
+    this.popups.add(p);
     this.spawned += 1;
     this.schedule();
   }
 }
 
 class Popup {
-  constructor({ x, y, w, h, message, bg, showHint, ttlMs, onDismiss }) {
+  constructor({ parent, x, y, w, h, message, bg, showHint, ttlMs, onDismiss }) {
     this.x = x;
     this.y = y;
     this.w = w;
@@ -296,9 +359,7 @@ class Popup {
     this.onDismiss = onDismiss;
     this.el = null;
     this.ttlTimer = null;
-  }
 
-  mount(parent) {
     const el = document.createElement("div");
     el.className = "popup";
     el.style.setProperty("--x", `${this.x}px`);
@@ -330,6 +391,9 @@ class Popup {
     el.addEventListener("click", () => this.dismiss());
     parent.appendChild(el);
     this.el = el;
+
+    this.el.getBoundingClientRect(); // reflow
+    this.el.style.transform = `translate3d(${this.x}px, ${this.y}px, 0)`;
 
     if (this.ttlMs && this.ttlMs > 0) {
       this.ttlTimer = window.setTimeout(() => this.dismiss(), this.ttlMs);
@@ -369,6 +433,112 @@ const escapeHtml = (s) =>
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#039;");
+
+// ======= 评价区功能 =======
+const btnReview = $("btnReview");
+const reviewsModal = $("reviewsModal");
+const closeReviews = $("closeReviews");
+const reviewsList = $("reviewsList");
+const reviewForm = $("reviewForm");
+const starRating = $("starRating");
+const reviewScore = $("reviewScore");
+const reviewHint = $("reviewHint");
+const reviewSubmit = $("reviewSubmit");
+
+const apiBase = window.__LOVEPOP_API_BASE__ || "";
+
+const renderReviews = (data) => {
+  if (!data || data.length === 0) {
+    reviewsList.innerHTML = `<div style="text-align:center; padding: 20px; color: gray;">暂时没有评价，快来抢沙发！</div>`;
+    return;
+  }
+  reviewsList.innerHTML = data.map(r => `
+    <div class="reviewItem">
+      <div class="reviewItemHead">
+        <div class="reviewItemName">${r.name}</div>
+        <div class="reviewItemDate">${new Date(r.created_at + "Z").toLocaleString()}</div>
+      </div>
+      <div class="reviewItemScore">${"★".repeat(r.score)}${"☆".repeat(5 - r.score)}</div>
+      <div class="reviewItemBody">${r.comment}</div>
+    </div>
+  `).join("");
+};
+
+const fetchReviews = async () => {
+  reviewsList.innerHTML = `<div style="text-align:center; padding: 20px; color: gray;">加载中...</div>`;
+  try {
+    const res = await fetch(`${apiBase}/api/reviews`);
+    const json = await res.json();
+    if (json.ok) renderReviews(json.data);
+  } catch (e) {
+    reviewsList.innerHTML = `<div style="text-align:center; padding: 20px; color: gray;">加载失败</div>`;
+  }
+};
+
+btnReview.onclick = () => {
+  reviewsModal.hidden = false;
+  fetchReviews();
+};
+
+closeReviews.onclick = () => {
+  reviewsModal.hidden = true;
+};
+
+// 星星打分交互
+const stars = starRating.querySelectorAll("span");
+stars.forEach(star => {
+  star.onclick = () => {
+    const val = parseInt(star.getAttribute("data-val"), 10);
+    reviewScore.value = val;
+    stars.forEach(s => {
+      const v = parseInt(s.getAttribute("data-val"), 10);
+      s.className = v <= val ? "active" : "";
+    });
+  };
+  star.onmouseenter = () => {
+    const val = parseInt(star.getAttribute("data-val"), 10);
+    stars.forEach(s => {
+      const v = parseInt(s.getAttribute("data-val"), 10);
+      if (v <= val) s.classList.add("hover");
+    });
+  };
+  star.onmouseleave = () => {
+    stars.forEach(s => s.classList.remove("hover"));
+  };
+});
+
+reviewForm.onsubmit = async (e) => {
+  e.preventDefault();
+  const name = $("reviewName").value.trim();
+  const comment = $("reviewComment").value.trim();
+  const score = parseInt(reviewScore.value, 10);
+
+  if (!comment) return;
+
+  reviewSubmit.disabled = true;
+  reviewHint.textContent = "提交中...";
+  
+  try {
+    const res = await fetch(`${apiBase}/api/reviews`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name, score, comment })
+    });
+    const json = await res.json();
+    if (json.ok) {
+      reviewHint.textContent = "提交成功！";
+      $("reviewComment").value = "";
+      setTimeout(() => { reviewHint.textContent = ""; }, 2000);
+      fetchReviews();
+    } else {
+      reviewHint.textContent = "提交失败: " + json.error;
+    }
+  } catch (err) {
+    reviewHint.textContent = "网络错误，请稍后再试";
+  } finally {
+    reviewSubmit.disabled = false;
+  }
+};
 
 const engine = new Engine();
 

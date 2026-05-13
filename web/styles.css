@@ -469,6 +469,64 @@ input[type="number"]:focus-visible {
   font-weight: 900;
 }
 
+.starRating {
+  display: flex;
+  gap: 8px;
+  font-size: 24px;
+  color: #ccc;
+  cursor: pointer;
+  user-select: none;
+}
+.starRating span.active,
+.starRating span.hover {
+  color: #ffb3c6;
+}
+.reviewsList {
+  max-height: 250px;
+  overflow-y: auto;
+  padding-right: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.reviewsList::-webkit-scrollbar {
+  width: 6px;
+}
+.reviewsList::-webkit-scrollbar-thumb {
+  background: rgba(20, 22, 26, 0.15);
+  border-radius: 4px;
+}
+.reviewItem {
+  background: rgba(255, 255, 255, 0.5);
+  border-radius: 12px;
+  padding: 10px 14px;
+  border: 1px solid rgba(0, 0, 0, 0.05);
+}
+.reviewItemHead {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4px;
+}
+.reviewItemName {
+  font-weight: 900;
+  font-size: 13px;
+  color: #333;
+}
+.reviewItemScore {
+  color: #ffb3c6;
+  font-size: 12px;
+}
+.reviewItemDate {
+  font-size: 10px;
+  color: #999;
+}
+.reviewItemBody {
+  font-size: 13px;
+  color: #555;
+  word-break: break-all;
+}
+
 .modalForm {
   padding-top: 12px;
   display: grid;
