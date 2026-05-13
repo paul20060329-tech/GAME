@@ -233,6 +233,16 @@ def _parse_cookies(header: str) -> Dict[str, str]:
     return out
 
 
+def _parse_origins(value: Optional[str]) -> List[str]:
+    if value is None:
+        return []
+    value = value.strip()
+    if not value:
+        return []
+    parts = [p.strip() for p in value.split(",")]
+    return [p for p in parts if p]
+
+
 def _read_body(handler: BaseHTTPRequestHandler, *, limit: int = 64_000) -> bytes:
     length_raw = handler.headers.get("Content-Length", "0").strip()
     try:
@@ -492,9 +502,32 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Cache-Control", "no-store")
         self.end_headers()
 
-    def _json(self, status: int, data: Dict[str, object]) -> None:
+    def _json(self, status: int, data: Dict[str, object], *, headers: Optional[List[Tuple[str, str]]] = None) -> None:
         raw = json.dumps(data, ensure_ascii=False).encode("utf-8")
-        self._send(status, raw, content_type="application/json; charset=utf-8")
+        self._send(status, raw, content_type="application/json; charset=utf-8", headers=headers)
+
+    def _cors_headers_for_api(self) -> List[Tuple[str, str]]:
+        origin = (self.headers.get("Origin") or "").strip()
+        allow = _read_env("CORS_ALLOW_ORIGINS")
+        allow_list = _parse_origins(allow)
+
+        headers: List[Tuple[str, str]] = [
+            ("Access-Control-Allow-Methods", "POST, OPTIONS"),
+            ("Access-Control-Allow-Headers", "Content-Type"),
+            ("Access-Control-Max-Age", "600"),
+        ]
+
+        if not origin:
+            return headers
+
+        if allow == "*":
+            headers.append(("Access-Control-Allow-Origin", "*"))
+            return headers
+
+        if origin in allow_list:
+            headers.append(("Access-Control-Allow-Origin", origin))
+            headers.append(("Vary", "Origin"))
+        return headers
 
     def _is_admin(self) -> bool:
         cookie = self.headers.get("Cookie") or ""
@@ -506,6 +539,14 @@ class Handler(BaseHTTPRequestHandler):
         if forwarded:
             return forwarded.split(",")[0].strip()
         return self.client_address[0]
+
+    def do_OPTIONS(self) -> None:
+        path = urlparse(self.path).path
+        if path == "/api/survey":
+            headers = self._cors_headers_for_api()
+            self._send(204, b"", content_type="text/plain; charset=utf-8", headers=headers)
+            return
+        self._send(404, b"Not Found", content_type="text/plain; charset=utf-8")
 
     def do_GET(self) -> None:
         app = self._app()
@@ -560,14 +601,15 @@ class Handler(BaseHTTPRequestHandler):
         path = urlparse(self.path).path
 
         if path == "/api/survey":
+            cors_headers = self._cors_headers_for_api()
             raw = _read_body(self, limit=96_000)
             data = _safe_json_loads(raw)
             consent = bool(data.get("consent"))
             if not consent:
-                self._json(400, {"ok": False, "error": "consent_required"})
+                self._json(400, {"ok": False, "error": "consent_required"}, headers=cors_headers)
                 return
             rec_id = app.store.insert_survey(data, user_agent=self.headers.get("User-Agent") or "", ip=self._client_ip())
-            self._json(200, {"ok": True, "id": rec_id})
+            self._json(200, {"ok": True, "id": rec_id}, headers=cors_headers)
             return
 
         if path == "/admin/login":

@@ -47,6 +47,7 @@ const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
 
 const storageKey = "lovePopSurveySubmittedV1";
 let surveyReady = false;
+const apiBase = String(window.__LOVEPOP_API_BASE__ || "").replace(/\/+$/, "");
 
 const setButtonsEnabled = (enabled) => {
   btnStart.disabled = !enabled;
@@ -104,7 +105,8 @@ const submitSurvey = async () => {
   surveyHint.textContent = "提交中…";
   surveySubmit.disabled = true;
   try {
-    const res = await fetch("/api/survey", {
+    const url = apiBase ? `${apiBase}/api/survey` : "/api/survey";
+    const res = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
