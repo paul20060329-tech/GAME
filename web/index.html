@@ -8,114 +8,177 @@
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
-    <div class="bg" aria-hidden="true">
-      <div class="blob b1"></div>
-      <div class="blob b2"></div>
-      <div class="blob b3"></div>
-      <div class="noise"></div>
+    <div class="pageShell">
+      <header class="topbar">
+        <a class="brand" href="/" aria-label="Love Pop Up 首页">
+          <span class="mark" aria-hidden="true">♥</span>
+          <span class="brandText">
+            <span class="brandTitle">Love Pop Up</span>
+            <span class="brandSub">交互式心形弹窗体验系统</span>
+          </span>
+        </a>
+
+        <nav class="navLinks" aria-label="页面导航">
+          <a href="#experience">体验</a>
+          <a href="#control">控制台</a>
+          <button class="linkButton" id="btnReview" type="button">反馈</button>
+          <a href="/admin" target="_blank" rel="noreferrer">后台</a>
+        </nav>
+
+        <div class="actions">
+          <button class="btn ghost" id="btnClear" type="button">清空</button>
+          <button class="btn primary" id="btnStart" type="button">开始体验</button>
+        </div>
+      </header>
+
+      <main class="layout" id="experience">
+        <section class="hero">
+          <div class="heroCopy">
+            <p class="eyebrow">毕业设计作品 · Web 动效 · 用户反馈</p>
+            <h1>把祝福文案生成一场可交互的心形弹窗雨</h1>
+            <p class="lead">
+              项目把桌面弹窗创意迁移为 Web 服务，支持图形编排、速度控制、自定义文案、用户调查、评价收集和后台数据导出。
+            </p>
+            <div class="heroActions">
+              <button class="btn primary large" id="btnHeroStart" type="button">立即生成</button>
+              <button class="btn soft large" id="btnDemo" type="button">一键演示</button>
+            </div>
+          </div>
+
+          <aside class="summaryPanel" aria-label="项目概览">
+            <div class="summaryTop">
+              <span>实时状态</span>
+              <strong id="chipStatus">就绪</strong>
+            </div>
+            <div class="metricGrid">
+              <div>
+                <b id="metricCreated">0</b>
+                <span>已生成</span>
+              </div>
+              <div>
+                <b id="metricVisible">0</b>
+                <span>屏幕中</span>
+              </div>
+              <div>
+                <b id="metricMode">爱心</b>
+                <span>当前图形</span>
+              </div>
+            </div>
+            <div class="progressTrack" aria-label="生成进度">
+              <span id="progressBar"></span>
+            </div>
+          </aside>
+        </section>
+
+        <section class="workbench" id="control">
+          <div class="stageCard">
+            <div class="stageHeader">
+              <div>
+                <h2>动效舞台</h2>
+                <p>弹窗会按照当前参数生成，点击单个弹窗可关闭。</p>
+              </div>
+              <div class="stageTools">
+                <button class="toolBtn" id="btnScreenshot" type="button">保存配置</button>
+                <button class="toolBtn" id="btnReset" type="button">重置</button>
+              </div>
+            </div>
+            <div class="stageViewport">
+              <div id="layer" class="layer" role="presentation"></div>
+              <div class="emptyState" id="emptyState">
+                <span>♥</span>
+                <strong>点击开始，生成你的专属弹窗动效</strong>
+                <small>支持爱心、五角星、六芒星和随机散落效果</small>
+              </div>
+            </div>
+          </div>
+
+          <aside class="controlPanel" aria-label="控制台">
+            <div class="panelSection">
+              <div class="sectionTitle">
+                <h2>场景预设</h2>
+                <span>快速切换展示风格</span>
+              </div>
+              <div class="presetGrid">
+                <button class="preset active" type="button" data-preset="gentle">温柔心动</button>
+                <button class="preset" type="button" data-preset="bright">元气祝福</button>
+                <button class="preset" type="button" data-preset="star">星光告白</button>
+              </div>
+            </div>
+
+            <div class="panelSection">
+              <div class="sectionTitle">
+                <h2>生成参数</h2>
+                <span>适合答辩展示调节</span>
+              </div>
+              <div class="fieldGrid">
+                <label class="field">
+                  <span>排列图形</span>
+                  <select id="shapeType">
+                    <option value="heart" selected>爱心</option>
+                    <option value="star5">五角星</option>
+                    <option value="star6">六芒星</option>
+                  </select>
+                </label>
+                <label class="field">
+                  <span>图形大小</span>
+                  <input id="sizeScale" type="range" min="0.6" max="2.2" step="0.1" value="1" />
+                </label>
+                <label class="field">
+                  <span>图形数量</span>
+                  <input id="countHeart" type="number" min="20" max="360" step="10" value="150" />
+                </label>
+                <label class="field">
+                  <span>随机数量</span>
+                  <input id="countRandom" type="number" min="0" max="260" step="10" value="70" />
+                </label>
+                <label class="field">
+                  <span>生成速度 ms</span>
+                  <input id="intervalMs" type="number" min="10" max="160" step="5" value="24" />
+                </label>
+                <label class="field">
+                  <span>自动消失 ms</span>
+                  <input id="ttlMs" type="number" min="0" max="12000" step="500" value="0" />
+                </label>
+              </div>
+            </div>
+
+            <div class="panelSection">
+              <div class="sectionTitle">
+                <h2>文案内容</h2>
+                <span>每行一条，留空使用默认</span>
+              </div>
+              <textarea id="customMessages" rows="5" placeholder="祝你天天开心&#10;愿你被温柔以待&#10;今天也要闪闪发光"></textarea>
+            </div>
+          </aside>
+        </section>
+      </main>
+
+      <footer class="footer">
+        <span>Python 后端</span>
+        <span>SQLAlchemy 数据存储</span>
+        <span>Web 动效交互</span>
+        <span>用户反馈闭环</span>
+      </footer>
     </div>
 
-    <header class="topbar">
-      <div class="brand">
-        <div class="mark" aria-hidden="true">❤</div>
-        <div class="brandText">
-          <div class="brandTitle">Love Pop Up</div>
-          <div class="brandSub">心形弹窗 · 轻盈 · 治愈</div>
-        </div>
-      </div>
-
-      <div class="actions">
-        <button class="btn" id="btnReview" type="button">大家在说啥</button>
-        <button class="btn primary" id="btnStart" type="button">开始</button>
-        <button class="btn" id="btnClear" type="button">清空</button>
-      </div>
-    </header>
-
-    <main class="stage" aria-label="弹窗舞台">
-      <div class="hud">
-        <div class="chip" id="chipStatus">就绪</div>
-        <div class="chip">
-          <span class="kbd">ESC</span>
-          <span class="sep">·</span>
-          停止并清空
-        </div>
-        <div class="chip">
-          点击任意弹窗
-          <span class="sep">·</span>
-          关闭它
-        </div>
-      </div>
-      <div id="layer" class="layer" role="presentation"></div>
-
-      <section class="panel" id="settingsPanel" aria-label="设置">
-        <button class="panelTitle" id="togglePanel" type="button">
-          <span>设置</span>
-          <span class="panelChevron" aria-hidden="true">⌄</span>
-        </button>
-        <div class="grid">
-          <label class="field">
-            <div class="label">排列图形</div>
-            <select id="shapeType">
-              <option value="heart" selected>爱心</option>
-              <option value="star5">五角星</option>
-              <option value="star6">六芒星</option>
-            </select>
-          </label>
-          <label class="field">
-            <div class="label">图形大小倍率</div>
-            <input id="sizeScale" type="number" min="0.5" max="3" step="0.1" value="1.0" />
-          </label>
-          <label class="field">
-            <div class="label">图形顶点数量</div>
-            <input id="countHeart" type="number" min="1" max="600" step="1" value="180" />
-          </label>
-          <label class="field">
-            <div class="label">随机数量</div>
-            <input id="countRandom" type="number" min="0" max="600" step="1" value="160" />
-          </label>
-          <label class="field">
-            <div class="label">速度 (ms)</div>
-            <input id="intervalMs" type="number" min="10" max="200" step="1" value="25" />
-          </label>
-          <label class="field">
-            <div class="label">自动消失 (ms)</div>
-            <input id="ttlMs" type="number" min="0" max="20000" step="100" value="0" />
-          </label>
-          <label class="field" style="grid-column: 1 / -1;">
-            <div class="label">自定义文案 (每行一条，不填使用默认)</div>
-            <textarea id="customMessages" rows="3" placeholder="例如：
-祝你天天开心
-事事顺心"></textarea>
-          </label>
-        </div>
-      </section>
-    </main>
-
-    <footer class="footer">
-      <span>Made for you</span>
-      <span class="dot">·</span>
-      <span>基于原 Tkinter 弹窗逻辑复刻为 Web 动效</span>
-    </footer>
-
     <div class="modal" id="surveyModal" role="dialog" aria-modal="true" aria-labelledby="surveyTitle" hidden>
-      <div class="modalCard">
+      <div class="modalCard compact">
         <div class="modalHeader">
           <div>
-            <div class="modalTitle" id="surveyTitle">进入前填写一下小信息</div>
-            <div class="modalSub">用于用户调查与分析（可不填联系方式）</div>
+            <div class="modalTitle" id="surveyTitle">进入体验前，留下基础信息</div>
+            <div class="modalSub">用于毕业设计用户调研，只记录你主动填写的内容。</div>
           </div>
-          <div class="modalMark" aria-hidden="true">❤</div>
+          <span class="modalMark" aria-hidden="true">♥</span>
         </div>
 
         <form id="surveyForm" class="modalForm">
           <div class="modalGrid">
             <label class="mField">
-              <div class="mLabel">昵称</div>
+              <span>昵称</span>
               <input id="surveyName" required maxlength="80" placeholder="怎么称呼你" />
             </label>
-
             <label class="mField">
-              <div class="mLabel">年龄段</div>
+              <span>年龄段</span>
               <select id="surveyAge" required>
                 <option value="" selected disabled>请选择</option>
                 <option value="≤18">≤18</option>
@@ -125,9 +188,8 @@
                 <option value="41+">41+</option>
               </select>
             </label>
-
             <label class="mField">
-              <div class="mLabel">性别</div>
+              <span>性别</span>
               <select id="surveyGender" required>
                 <option value="" selected disabled>请选择</option>
                 <option value="女">女</option>
@@ -135,19 +197,16 @@
                 <option value="其他/不便透露">其他/不便透露</option>
               </select>
             </label>
-
             <label class="mField">
-              <div class="mLabel">城市</div>
+              <span>城市</span>
               <input id="surveyCity" maxlength="80" placeholder="例如：深圳" />
             </label>
-
             <label class="mField">
-              <div class="mLabel">职业</div>
-              <input id="surveyOcc" maxlength="80" placeholder="例如：学生 / 产品 / 设计" />
+              <span>身份</span>
+              <input id="surveyOcc" maxlength="80" placeholder="例如：学生 / 设计 / 产品" />
             </label>
-
             <label class="mField">
-              <div class="mLabel">来这里想做什么</div>
+              <span>使用目的</span>
               <select id="surveyPurpose">
                 <option value="放松一下" selected>放松一下</option>
                 <option value="找灵感">找灵感</option>
@@ -158,63 +217,62 @@
           </div>
 
           <label class="mField">
-            <div class="mLabel">想对我说的话</div>
-            <textarea id="surveyFeedback" maxlength="2000" placeholder="例如：希望增加更多特效/配色/文案…"></textarea>
+            <span>建议或期待</span>
+            <textarea id="surveyFeedback" maxlength="2000" placeholder="例如：希望增加更多特效、配色或分享功能"></textarea>
           </label>
-
           <label class="mField">
-            <div class="mLabel">联系方式（可选）</div>
-            <input id="surveyContact" maxlength="120" placeholder="微信/QQ/邮箱（可不填）" />
+            <span>联系方式（可选）</span>
+            <input id="surveyContact" maxlength="120" placeholder="微信 / QQ / 邮箱，可不填" />
           </label>
-
           <label class="mCheck">
             <input id="surveyConsent" type="checkbox" required />
-            <span>我同意提交以上信息用于调查与分析</span>
+            <span>我同意提交以上信息用于本项目调研与分析</span>
           </label>
 
           <div class="modalActions">
             <button class="btn primary" id="surveySubmit" type="submit">提交并进入</button>
           </div>
-
           <div class="modalHint" id="surveyHint"></div>
         </form>
       </div>
     </div>
 
-    <div class="modal" id="reviewsModal" role="dialog" hidden>
+    <div class="modal" id="reviewsModal" role="dialog" aria-modal="true" aria-labelledby="reviewsTitle" hidden>
       <div class="modalCard">
         <div class="modalHeader">
           <div>
-            <div class="modalTitle">大家在说啥</div>
-            <div class="modalSub">快来分享你的体验</div>
+            <div class="modalTitle" id="reviewsTitle">用户反馈</div>
+            <div class="modalSub">评价会进入后台，方便后续作品迭代。</div>
           </div>
-          <button type="button" class="popupClose" id="closeReviews" style="position:static;">×</button>
+          <button type="button" class="iconClose" id="closeReviews" aria-label="关闭">×</button>
         </div>
 
         <div class="reviewsLayout">
           <div class="reviewsList" id="reviewsList">
-            <!-- 评论列表将通过 JS 动态生成 -->
-            <div style="text-align:center; padding: 20px; color: gray;">加载中...</div>
+            <div class="loading">加载中...</div>
           </div>
 
-          <form id="reviewForm" class="modalForm" style="border-top: 1px solid rgba(0,0,0,0.08); margin-top: 12px; padding-top: 16px;">
-            <div class="mLabel">打个分吧</div>
-            <div class="starRating" id="starRating">
-              <span data-val="1">★</span><span data-val="2">★</span><span data-val="3">★</span><span data-val="4">★</span><span data-val="5" class="active">★</span>
+          <form id="reviewForm" class="modalForm reviewForm">
+            <div class="ratingRow">
+              <span>体验评分</span>
+              <div class="starRating" id="starRating" aria-label="评分">
+                <button type="button" data-val="1">★</button>
+                <button type="button" data-val="2">★</button>
+                <button type="button" data-val="3">★</button>
+                <button type="button" data-val="4">★</button>
+                <button type="button" data-val="5" class="active">★</button>
+              </div>
+              <input type="hidden" id="reviewScore" value="5" />
             </div>
-            <input type="hidden" id="reviewScore" value="5" />
-
-            <label class="mField" style="margin-top: 8px;">
-              <div class="mLabel">昵称</div>
+            <label class="mField">
+              <span>昵称</span>
               <input id="reviewName" placeholder="你的昵称" maxlength="80" required />
             </label>
-
-            <label class="mField" style="margin-top: 8px;">
-              <div class="mLabel">评论内容</div>
-              <textarea id="reviewComment" placeholder="写下你的使用体验..." maxlength="2000" style="min-height:60px;" required></textarea>
+            <label class="mField">
+              <span>评论内容</span>
+              <textarea id="reviewComment" placeholder="写下你的使用体验或建议" maxlength="2000" required></textarea>
             </label>
-
-            <div class="modalActions" style="margin-top: 12px;">
+            <div class="modalActions">
               <button class="btn primary" type="submit" id="reviewSubmit">提交评价</button>
             </div>
             <div id="reviewHint" class="modalHint"></div>
@@ -224,7 +282,7 @@
     </div>
 
     <script>
-      window.__LOVEPOP_API_BASE__ = "https://one-love-pop-up-window.onrender.com/";
+      window.__LOVEPOP_API_BASE__ = "";
     </script>
     <script src="./app.js"></script>
   </body>
