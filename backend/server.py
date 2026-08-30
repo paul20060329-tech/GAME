@@ -2,6 +2,7 @@ import argparse
 import json
 import os
 import secrets
+import sqlite3
 import time
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -660,7 +661,7 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/reviews":
             rows = app.store.list_reviews(limit=50)
             data = [{"name": r["name"], "score": r["score"], "comment": r["comment"], "created_at": r["created_at"]} for r in rows]
-            self._json(200, {"ok": True, "data": data}, headers=_cors_headers())
+            self._json(200, {"ok": True, "data": data}, headers=self._cors_headers_for_api())
             return
 
         if path == "/health":
@@ -783,8 +784,8 @@ class Handler(BaseHTTPRequestHandler):
 
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser()
-    p.add_argument("--host", default="127.0.0.1")
-    p.add_argument("--port", type=int, default=5173)
+    p.add_argument("--host", default=_read_env("HOST") or "0.0.0.0")
+    p.add_argument("--port", type=int, default=int(_read_env("PORT") or "5173"))
     return p
 
 
