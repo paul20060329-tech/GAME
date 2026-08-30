@@ -422,134 +422,271 @@ def _admin_login_page(*, message: str) -> bytes:
     return html.encode("utf-8")
 
 
-def _admin_dashboard_page(*, stats: Dict[str, object], rows: List[sqlite3.Row]) -> bytes:
-    def _pairs(items: List[Tuple[str, int]]) -> str:
+def _admin_dashboard_page(*, stats: Dict[str, object], rows: List[sqlite3.Row], reviews: List[Dict[str, object]]) -> bytes:
+    def _bars(items: List[Tuple[str, int]]) -> str:
         chunks = []
-        for k, c in items[:12]:
-            chunks.append(f"<span class='pill'><b>{_html_escape(k)}</b><em>{c}</em></span>")
-        return "".join(chunks) if chunks else "<span class='muted'>暂无</span>"
+        max_count = max([int(c) for _, c in items], default=0)
+        for k, c in items[:8]:
+            count = int(c)
+            width = 0 if max_count <= 0 else max(8, round(count / max_count * 100))
+            chunks.append(
+                "<div class='barItem'>"
+                f"<div class='barMeta'><b>{_html_escape(str(k))}</b><span>{count}</span></div>"
+                f"<div class='barTrack'><i style='width:{width}%'></i></div>"
+                "</div>"
+            )
+        return "".join(chunks) if chunks else "<div class='emptyBox'>暂无数据</div>"
 
     total = int(stats.get("total") or 0)
     today = int(stats.get("today") or 0)
     age = stats.get("ageRange") or []
     gender = stats.get("gender") or []
     cities = stats.get("topCities") or []
+    review_count = len(reviews)
+    avg_score = 0
+    if review_count:
+        avg_score = round(sum(int(r.get("score") or 0) for r in reviews) / review_count, 1)
 
     trs = []
     for r in rows:
+        search_text = " ".join(
+            [
+                str(r["name"] or ""),
+                str(r["age_range"] or ""),
+                str(r["gender"] or ""),
+                str(r["city"] or ""),
+                str(r["occupation"] or ""),
+                str(r["purpose"] or ""),
+                str(r["feedback"] or ""),
+                str(r["contact"] or ""),
+            ]
+        )
         trs.append(
-            "<tr>"
+            f"<tr data-search='{_html_escape(search_text.lower())}'>"
             f"<td>{r['id']}</td>"
             f"<td>{_html_escape(str(r['created_at'] or ''))}</td>"
-            f"<td>{_html_escape(str(r['name'] or ''))}</td>"
+            f"<td><strong>{_html_escape(str(r['name'] or ''))}</strong></td>"
             f"<td>{_html_escape(str(r['age_range'] or ''))}</td>"
             f"<td>{_html_escape(str(r['gender'] or ''))}</td>"
             f"<td>{_html_escape(str(r['city'] or ''))}</td>"
             f"<td>{_html_escape(str(r['occupation'] or ''))}</td>"
             f"<td>{_html_escape(str(r['purpose'] or ''))}</td>"
+            f"<td class='wide'>{_html_escape(str(r['feedback'] or ''))}</td>"
             f"<td>{_html_escape(str(r['contact'] or ''))}</td>"
             "</tr>"
         )
 
-    table = "".join(trs) if trs else "<tr><td colspan='9' class='muted'>暂无数据</td></tr>"
+    table = "".join(trs) if trs else "<tr><td colspan='10' class='emptyCell'>暂无调查记录</td></tr>"
+
+    review_cards = []
+    for r in reviews[:80]:
+        score = max(1, min(5, int(r.get("score") or 5)))
+        name = _html_escape(str(r.get("name") or "匿名用户"))
+        comment = _html_escape(str(r.get("comment") or ""))
+        created_at = _html_escape(str(r.get("created_at") or ""))
+        search_text = f"{name} {comment}".lower()
+        review_cards.append(
+            f"<article class='reviewCard' data-search='{_html_escape(search_text)}'>"
+            f"<div class='reviewHead'><b>{name}</b><span>{created_at}</span></div>"
+            f"<div class='stars'>{'★' * score}{'☆' * (5 - score)}</div>"
+            f"<p>{comment}</p>"
+            "</article>"
+        )
+    review_list = "".join(review_cards) if review_cards else "<div class='emptyBox'>暂无用户反馈</div>"
 
     html = f"""<!doctype html>
 <html lang="zh-CN">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Admin</title>
+    <title>Love Pop Up Admin</title>
     <style>
-      body {{ margin: 0; font-family: "Microsoft YaHei", system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; background: #fff6fa; color: rgba(20, 22, 26, 0.92); }}
-      header {{ position: sticky; top: 0; padding: 14px 16px; display: flex; justify-content: space-between; align-items: center; background: rgba(255, 255, 255, 0.7); backdrop-filter: blur(16px); border-bottom: 1px solid rgba(255, 179, 198, 0.35); }}
-      h1 {{ margin: 0; font-size: 16px; }}
-      .btns {{ display: flex; gap: 10px; }}
-      a.btn, button.btn {{ display: inline-flex; align-items: center; justify-content: center; padding: 9px 12px; border-radius: 14px; border: 1px solid rgba(20, 22, 26, 0.14); background: rgba(255, 255, 255, 0.75); color: rgba(20, 22, 26, 0.9); text-decoration: none; font-weight: 900; cursor: pointer; }}
-      a.btn.primary {{ border-color: rgba(255, 179, 198, 0.65); background: linear-gradient(135deg, rgba(255, 209, 220, 0.88), rgba(205, 239, 253, 0.78)); }}
-      main {{ padding: 16px; display: grid; gap: 14px; }}
-      .grid {{ display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }}
-      .card {{ padding: 14px; border-radius: 18px; border: 1px solid rgba(255, 179, 198, 0.35); background: rgba(255, 255, 255, 0.75); box-shadow: 0 20px 55px rgba(16, 18, 22, 0.08); }}
-      .kpi {{ display: flex; gap: 12px; align-items: baseline; }}
-      .kpi b {{ font-size: 30px; letter-spacing: .3px; }}
-      .kpi span {{ color: rgba(20, 22, 26, 0.6); font-weight: 800; }}
-      .muted {{ color: rgba(20, 22, 26, 0.56); font-weight: 800; }}
-      .pillRow {{ display: flex; flex-wrap: wrap; gap: 8px; }}
-      .pill {{ display: inline-flex; gap: 8px; align-items: baseline; padding: 7px 10px; border-radius: 999px; border: 1px solid rgba(20, 22, 26, 0.12); background: rgba(255, 255, 255, 0.85); }}
-      .pill b {{ font-size: 12px; }}
-      .pill em {{ font-style: normal; color: rgba(20, 22, 26, 0.56); font-weight: 900; }}
-      table {{ width: 100%; border-collapse: collapse; }}
-      th, td {{ padding: 10px 10px; border-bottom: 1px solid rgba(20, 22, 26, 0.08); vertical-align: top; }}
-      th {{ text-align: left; font-size: 12px; color: rgba(20, 22, 26, 0.62); }}
-      td {{ font-size: 12px; }}
-      .tableWrap {{ overflow: auto; border-radius: 14px; border: 1px solid rgba(20, 22, 26, 0.08); background: rgba(255, 255, 255, 0.8); }}
-      form {{ margin: 0; }}
-      @media (max-width: 960px) {{ .grid {{ grid-template-columns: 1fr; }} }}
+      :root {{ --bg:#f6f8fb; --surface:#fff; --soft:#f1f5f9; --ink:#172033; --muted:#667085; --line:#dce4ef; --rose:#e94f7b; --sky:#3f86d9; --mint:#24a98d; --amber:#e7a72f; --shadow:0 16px 38px rgba(23,32,51,.09); }}
+      * {{ box-sizing: border-box; }}
+      body {{ margin:0; font-family:"Microsoft YaHei", system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; color:var(--ink); background:linear-gradient(135deg, rgba(233,79,123,.08), transparent 32%), linear-gradient(225deg, rgba(36,169,141,.08), transparent 30%), var(--bg); }}
+      a {{ color:inherit; text-decoration:none; }}
+      header {{ position:sticky; top:0; z-index:10; display:flex; justify-content:space-between; align-items:center; gap:16px; padding:16px 24px; border-bottom:1px solid rgba(220,228,239,.85); background:rgba(246,248,251,.92); backdrop-filter:blur(14px); }}
+      h1,h2,p {{ margin-top:0; }}
+      h1 {{ margin-bottom:3px; font-size:20px; }}
+      h2 {{ margin-bottom:4px; font-size:16px; }}
+      .sub {{ margin:0; color:var(--muted); font-size:12px; font-weight:700; }}
+      .btns {{ display:flex; flex-wrap:wrap; justify-content:flex-end; gap:8px; }}
+      .btn, button.btn {{ min-height:38px; display:inline-flex; align-items:center; justify-content:center; padding:0 12px; border:1px solid var(--line); border-radius:8px; background:var(--surface); color:var(--ink); font-weight:900; cursor:pointer; box-shadow:0 8px 18px rgba(23,32,51,.05); }}
+      .btn.primary {{ color:#fff; border-color:var(--rose); background:linear-gradient(135deg, var(--rose), #c93361); }}
+      .btn.blue {{ color:#1459a8; border-color:#c8dfff; background:#eef6ff; }}
+      main {{ width:min(1440px, calc(100vw - 32px)); margin:0 auto; padding:22px 0 30px; display:grid; gap:16px; }}
+      .hero {{ display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:12px; }}
+      .card {{ border:1px solid var(--line); border-radius:8px; background:rgba(255,255,255,.94); box-shadow:var(--shadow); }}
+      .kpi {{ min-height:116px; padding:18px; display:grid; align-content:space-between; }}
+      .kpi span {{ color:var(--muted); font-size:12px; font-weight:900; }}
+      .kpi b {{ font-size:34px; line-height:1; }}
+      .kpi small {{ color:var(--muted); font-weight:700; }}
+      .dash {{ display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; }}
+      .chart {{ padding:16px; }}
+      .barItem {{ display:grid; gap:6px; margin-top:12px; }}
+      .barMeta {{ display:flex; align-items:center; justify-content:space-between; gap:10px; font-size:12px; }}
+      .barMeta b {{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }}
+      .barMeta span {{ color:var(--muted); font-weight:900; }}
+      .barTrack {{ height:9px; overflow:hidden; border-radius:999px; background:#e8edf5; }}
+      .barTrack i {{ display:block; height:100%; border-radius:999px; background:linear-gradient(90deg,var(--rose),var(--amber),var(--mint)); }}
+      .section {{ padding:16px; }}
+      .sectionHead {{ display:flex; justify-content:space-between; align-items:flex-end; gap:12px; margin-bottom:12px; }}
+      .toolbar {{ display:flex; align-items:center; gap:8px; }}
+      .search {{ width:min(340px, 48vw); min-height:38px; border:1px solid var(--line); border-radius:8px; padding:0 12px; outline:none; font-weight:800; background:#fff; }}
+      .tabs {{ display:flex; gap:8px; }}
+      .tab {{ min-height:36px; border:1px solid var(--line); border-radius:8px; padding:0 12px; background:#fff; color:var(--muted); font-weight:900; cursor:pointer; }}
+      .tab.active {{ color:#fff; border-color:var(--sky); background:linear-gradient(135deg,var(--sky),var(--mint)); }}
+      .panel[hidden] {{ display:none; }}
+      .tableWrap {{ overflow:auto; border:1px solid var(--line); border-radius:8px; background:#fff; }}
+      table {{ width:100%; min-width:1060px; border-collapse:collapse; }}
+      th,td {{ padding:11px 12px; border-bottom:1px solid #edf1f6; text-align:left; vertical-align:top; font-size:12px; }}
+      th {{ position:sticky; top:0; z-index:1; background:#f8fafc; color:#667085; font-weight:900; }}
+      tr:hover td {{ background:#fbfdff; }}
+      td strong {{ font-size:13px; }}
+      .wide {{ min-width:220px; max-width:360px; line-height:1.6; color:#475467; }}
+      .reviewGrid {{ display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; }}
+      .reviewCard {{ padding:14px; border:1px solid var(--line); border-radius:8px; background:#fff; }}
+      .reviewHead {{ display:flex; justify-content:space-between; gap:10px; margin-bottom:8px; }}
+      .reviewHead b {{ font-size:14px; }}
+      .reviewHead span {{ color:var(--muted); font-size:11px; white-space:nowrap; }}
+      .stars {{ margin-bottom:8px; color:var(--amber); letter-spacing:1px; }}
+      .reviewCard p {{ margin:0; color:#475467; line-height:1.7; word-break:break-word; }}
+      .emptyBox,.emptyCell {{ min-height:120px; display:grid; place-items:center; color:var(--muted); font-weight:900; }}
+      .emptyCell {{ display:table-cell; text-align:center; }}
+      .hide {{ display:none !important; }}
+      form {{ margin:0; }}
+      @media (max-width: 1050px) {{ .hero,.dash,.reviewGrid {{ grid-template-columns:1fr 1fr; }} header,.sectionHead {{ align-items:flex-start; flex-direction:column; }} .btns {{ justify-content:flex-start; }} }}
+      @media (max-width: 680px) {{ main {{ width:min(100vw - 20px, 1440px); }} .hero,.dash,.reviewGrid {{ grid-template-columns:1fr; }} .toolbar {{ width:100%; align-items:stretch; flex-direction:column; }} .search {{ width:100%; }} }}
     </style>
   </head>
   <body>
     <header>
-      <h1>用户调查后台</h1>
+      <div>
+        <h1>Love Pop Up 数据后台</h1>
+        <p class="sub">查看用户调查、使用反馈和基础分布数据</p>
+      </div>
       <div class="btns">
-        <a class="btn" href="/">回到网站</a>
+        <a class="btn blue" href="/">回到网站</a>
         <a class="btn primary" href="/admin/export.csv">导出调查 CSV</a>
-        <a class="btn primary" href="/admin/export_reviews.csv" style="background:#fff3b0; color:#111; border-color:#ffe7c7;">导出评价 CSV</a>
+        <a class="btn primary" href="/admin/export_reviews.csv">导出反馈 CSV</a>
         <form method="post" action="/admin/logout"><button class="btn" type="submit">退出</button></form>
       </div>
     </header>
     <main>
-      <section class="grid">
-        <div class="card">
-          <div class="muted">总提交数</div>
-          <div class="kpi"><b>{total}</b><span>条</span></div>
+      <section class="hero">
+        <div class="card kpi">
+          <span>调查提交</span>
+          <b>{total}</b>
+          <small>用户进入体验前提交的信息</small>
         </div>
-        <div class="card">
-          <div class="muted">今天(UTC)</div>
-          <div class="kpi"><b>{today}</b><span>条</span></div>
+        <div class="card kpi">
+          <span>今日新增 UTC</span>
+          <b>{today}</b>
+          <small>用于观察近期访问活跃度</small>
         </div>
-        <div class="card">
-          <div class="muted">Top 城市</div>
-          <div class="pillRow">{_pairs(cities)}</div>
+        <div class="card kpi">
+          <span>反馈数量</span>
+          <b>{review_count}</b>
+          <small>用户主动评价和建议</small>
         </div>
-      </section>
-
-      <section class="grid">
-        <div class="card">
-          <div class="muted">年龄段</div>
-          <div class="pillRow">{_pairs(age)}</div>
-        </div>
-        <div class="card">
-          <div class="muted">性别</div>
-          <div class="pillRow">{_pairs(gender)}</div>
-        </div>
-        <div class="card">
-          <div class="muted">最近提交</div>
-          <div class="muted">默认显示最近 200 条</div>
+        <div class="card kpi">
+          <span>平均评分</span>
+          <b>{avg_score or "-"}</b>
+          <small>满分 5 分</small>
         </div>
       </section>
 
-      <section class="card">
-        <div class="tableWrap">
-          <table>
-            <thead>
-              <tr>
-                <th>ID</th>
-                <th>时间(UTC)</th>
-                <th>姓名/昵称</th>
-                <th>年龄段</th>
-                <th>性别</th>
-                <th>城市</th>
-                <th>职业</th>
-                <th>用途</th>
-                <th>联系方式</th>
-              </tr>
-            </thead>
-            <tbody>
-              {table}
-            </tbody>
-          </table>
+      <section class="dash">
+        <div class="card chart">
+          <h2>年龄段分布</h2>
+          <p class="sub">了解主要体验人群</p>
+          {_bars(age)}
+        </div>
+        <div class="card chart">
+          <h2>性别分布</h2>
+          <p class="sub">辅助用户画像分析</p>
+          {_bars(gender)}
+        </div>
+        <div class="card chart">
+          <h2>城市 Top 8</h2>
+          <p class="sub">查看访问来源集中区域</p>
+          {_bars(cities)}
+        </div>
+      </section>
+
+      <section class="card section">
+        <div class="sectionHead">
+          <div>
+            <h2>记录查看</h2>
+            <p class="sub">默认展示最近调查 200 条、最近反馈 80 条</p>
+          </div>
+          <div class="toolbar">
+            <input class="search" id="searchInput" placeholder="搜索昵称、城市、建议、反馈..." />
+            <div class="tabs">
+              <button class="tab active" type="button" data-tab="surveyPanel">调查记录</button>
+              <button class="tab" type="button" data-tab="reviewPanel">用户反馈</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel" id="surveyPanel">
+          <div class="tableWrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>时间 UTC</th>
+                  <th>昵称</th>
+                  <th>年龄</th>
+                  <th>性别</th>
+                  <th>城市</th>
+                  <th>身份</th>
+                  <th>目的</th>
+                  <th>建议</th>
+                  <th>联系方式</th>
+                </tr>
+              </thead>
+              <tbody id="surveyRows">
+                {table}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="panel" id="reviewPanel" hidden>
+          <div class="reviewGrid" id="reviewRows">
+            {review_list}
+          </div>
         </div>
       </section>
     </main>
+    <script>
+      const searchInput = document.getElementById("searchInput");
+      const tabs = Array.from(document.querySelectorAll(".tab"));
+      const panels = Array.from(document.querySelectorAll(".panel"));
+
+      const activePanel = () => panels.find((panel) => !panel.hidden);
+      const applySearch = () => {{
+        const q = (searchInput.value || "").trim().toLowerCase();
+        const panel = activePanel();
+        if (!panel) return;
+        panel.querySelectorAll("[data-search]").forEach((item) => {{
+          item.classList.toggle("hide", q && !item.dataset.search.includes(q));
+        }});
+      }};
+
+      tabs.forEach((tab) => {{
+        tab.addEventListener("click", () => {{
+          tabs.forEach((item) => item.classList.toggle("active", item === tab));
+          panels.forEach((panel) => {{
+            panel.hidden = panel.id !== tab.dataset.tab;
+          }});
+          applySearch();
+        }});
+      }});
+
+      searchInput.addEventListener("input", applySearch);
+    </script>
   </body>
 </html>"""
     return html.encode("utf-8")
@@ -674,7 +811,8 @@ class Handler(BaseHTTPRequestHandler):
                 return
             stats = app.store.stats()
             rows = app.store.list_surveys(limit=200)
-            self._send(200, _admin_dashboard_page(stats=stats, rows=rows), content_type="text/html; charset=utf-8")
+            reviews = app.store.list_reviews(limit=80)
+            self._send(200, _admin_dashboard_page(stats=stats, rows=rows, reviews=reviews), content_type="text/html; charset=utf-8")
             return
 
         if path == "/admin/login":
